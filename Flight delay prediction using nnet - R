@@ -1,0 +1,43 @@
+data = read.csv("flight_data.csv")
+data = data[data$MONTH==1,] # analysing data for only january
+
+fl_data = data[,c(3,4,6,7,8,9,15,16,24,30,36)] # feature selection
+fl_data = fl_data[,c(1,2,3,4,5,6,7,8,9,11,10)] # taking the target variable in the last
+fl_data = na.omit(fl_data) # remove na values
+
+#data transformation for comparison between airlines
+library("dplyr")
+airline_data = fl_data %>% group_by(UNIQUE_CARRIER) %>% summarize(count = n(), min_departure = min(DEP_DELAY), max_departure = max(DEP_DELAY), mean = mean(DEP_DELAY), median = median(DEP_DELAY))
+
+# Visualize data for airlines
+library("ggplot2")
+airline_data$Count_Percentage  = prop.table(airline_data$count)*100
+ggplot(airline_data, aes(x= airline_data$UNIQUE_CARRIER )) + geom_bar( aes(y=airline_data$Count_Percentage), stat = "identity", fill = "orange") + theme_bw() + labs(x="Percentage", y= "Airline", title= "Percentage Distribution of Airines")
+
+# spliting the dataset into 12 diff sets acc to airlines
+airlines = split(fl_data, fl_data$UNIQUE_CARRIER)
+wn1 = data.frame(airlines$WN) # data of wn selected coz maximum percentage used
+wn1= wn1[,c(-3)]
+write.csv(wn1, "wn1_airline.csv")
+wn = as.data.frame(scale(wn1[-10]))
+wn = data.frame(wn,wn1[10])
+
+#Spliting data into train and test
+wn_sample = wn[sample(1:nrow(wn)),]
+wn_train = wn[1:floor(nrow(wn_sample)*0.70),]
+wn_test = wn[floor(nrow(wn_sample)*0.70):nrow(wn_sample),]
+
+#making a neural network
+library(nnet)
+library(NeuralNetTools)
+model_nnet <- nnet(ARR_DELAY ~ ., data=wn_train, size=20, maxit=200,  linout = TRUE)
+plot(model_nnet$fitted.values, model_nnet$residuals)
+summary(model_nnet)
+pred<- as.data.frame(predict(model_nnet, wn_test, type="raw"))
+
+plot(pred$V1,wn_test$ARR_DELAY, type = 'o')
+plot(wn_test$ARR_DELAY, type = "o")
+
+# Finding the root-mean quare error
+RMSE = sqrt(mean((pred$V1 - wn_test$ARR_DELAY)^2))
+
