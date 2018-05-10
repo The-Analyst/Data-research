@@ -1,0 +1,76 @@
+library(rvest)
+library(stringr)
+library(dplyr)
+library(lubridate)
+library(readr)
+library(RSelenium)
+library(httr)
+library(Rcpp)
+library(devtools)
+
+#Automation through Selenium(surfing different pages- NEXT REVIEWS)
+#rsDriver(browser = c("chrome")) #Start a selenium server
+
+#require(RSelenium)
+#remDr = remoteDriver() #reference class of RSelenium 
+#remDr$open           # to connect to RSelenium server
+#remDr$getStatus
+#remDr$navigate("https://www.tripadvisor.com.sg/Hotel_Review-g1497917-d4697044-Reviews-Arundina_Cameron_Highlands-Tanah_Rata_Cameron_Highlands_Pahang.html")
+#webElem = remDr$findElement(using="class name", "nav next taLnk ui_button primary") #finding the element for the 'NEXT' Button on the web page
+#------------------------------------------------------------#
+
+
+#loading the data set in ta_data
+ta_data <- read_html("https://www.tripadvisor.com.sg/Hotel_Review-g1497917-d4697044-Reviews-Arundina_Cameron_Highlands-Tanah_Rata_Cameron_Highlands_Pahang.html")
+
+
+# Extracting the loop counter(counter for number of review pages)
+count = ta_data %>% html_nodes(".pagination-details  ") %>% html_text(trim=TRUE)
+count = str_sub(count,10,(length(count)-10)) # extracts the total number of reviews 
+count = as.numeric(count)
+x=  ceiling((count/5))  # extracts the total number of review pages( 5 reviews/page)
+
+TA=0
+url_count =5
+
+#loops to surf all the review pages one by one
+ for(c in 1:x){
+   #Getting all the review data stored as review in 'reviewSelector' class (after analysing from source page) 
+   result = ta_data %>% html_nodes(".reviewSelector")
+   
+   #Extracting all the columns one by one 
+   record = vector("list", length = length(result))
+   
+   for(i in seq_along(result)) {
+     subject = result[i] %>% html_nodes(".noQuotes") %>% html_text(trim=TRUE)
+     name = result[i] %>% html_nodes(".info_text") %>% html_text(trim=TRUE)
+     review = result[i] %>% html_nodes(".partial_entry") %>% html_text(trim=TRUE)
+     time = result[i] %>% html_nodes(".ratingDate") %>% html_text(trim=TRUE)
+     if(length(result[i] %>% html_nodes(".userLoc") %>% html_text(trim=TRUE)) == 0)
+     {
+       location = " "
+     }
+     else {
+       location = result[i] %>% html_nodes(".userLoc") %>% html_text(trim=TRUE)
+     }
+     
+     #combining the values in a dataframe
+     record[[i]] = data_frame( Subject= subject, Name = name, Review = review, Time = time, Location = location )
+   }
+   
+   df = bind_rows(record)
+   TA = rbind(TA,df)
+   
+   #surfing through the url
+   url_string = toString(url_count)
+   url =  paste("https://www.tripadvisor.com.sg/Hotel_Review-g1497917-d4697044-Reviews-or", url_string , "-Arundina_Cameron_Highlands-Tanah_Rata_Cameron_Highlands_Pahang.html", sep = "")
+   ta_data <- read_html(url)
+   url_count = url_count + 5
+   
+   #surfing to the next page using Selenium
+   #webElem$sendKeysToElement(list(key= 'enter'))
+
+   
+ }
+TA = TA[2:nrow(TA),]
+write.csv(TA, "Tripadv.csv")
