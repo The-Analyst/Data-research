@@ -1,0 +1,44 @@
+#Gradient Descent- Mini Batch
+
+import pandas as pd
+from sklearn.model_selection import train_test_split
+from neupy import algorithms, layers, estimators, environment
+from sklearn import  preprocessing
+​
+​
+environment.reproducible()
+​
+wn_data = pd.read_csv("wn1_airline.csv")
+data = wn_data.iloc[0:50000,0:9]
+target = wn_data.iloc[0:50000,[9]]
+​
+data_scaler = preprocessing.MinMaxScaler()
+target_scaler = preprocessing.MinMaxScaler()
+​
+data = data_scaler.fit_transform(data)
+target = target_scaler.fit_transform(target)
+​
+x_train, x_test, y_train, y_test = train_test_split(
+    data, target, test_size=0.30
+)
+​
+cgnet = algorithms.MinibatchGradientDescent(
+    (9,50,10,1),
+    batch_size=32,
+    show_epoch=2,
+    verbose=True,
+)
+​
+cgnet.train(x_train, y_train, epochs=20)
+y_predict = cgnet.predict(x_test)
+​
+#saving the trained model to disc
+from sklearn.externals import joblib
+filename = 'finalized_model_MBGD.sav'
+joblib.dump(cgnet, filename)
+​
+#y_test = target_scaler.inverse_transform(y_test.reshape((-1, 1)))
+#y_predict = target_scaler.inverse_transform(y_predict).T.round(1)
+error = estimators.rmse(y_predict, y_test)
+print("RMSE = {}".format(error))
+​
